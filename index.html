@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Data Storage Finder</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- jsPDF for PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Use Inter font family */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Simple transition for smoother UI changes */
+        .transition-all {
+            transition: all 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <div id="app">
+        <!-- The application will be rendered here by JavaScript -->
+    </div>
+
+    <script>
+        // --- DATA AND STATE MANAGEMENT ---
+
+        // Application state
+        let state = {
+            currentStep: 0,
+            selections: {
+                classification: null,
+                amount: null,
+                collaboration: null,
+                usage: null,
+                backup: null
+            },
+            showResults: false,
+            selectedServices: [],
+            showClassificationHelp: false
+        };
+
+        // SVG Icons (replaces lucide-react)
+        const icons = {
+            check: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-white"><path d="M20 6 9 17l-5-5"/></svg>`,
+            chevronRight: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="m9 18 6-6-6-6"/></svg>`,
+            chevronLeft: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="m15 18-6-6 6-6"/></svg>`,
+            info: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`,
+            shield: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+            database: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>`,
+            users: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+            helpCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-gray-400 cursor-help"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>`,
+            download: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>`,
+            alertCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-12 h-12 text-yellow-600 mx-auto mb-4"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>`,
+            externalLink: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>`,
+            award: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>`,
+            refreshCw: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>`,
+            bookOpen: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`,
+        };
+        
+        // Storage options data with explicit Tailwind classes for dynamic coloring
+        const storageOptions = [
+            {
+                id: 'google-drive', name: 'Google Drive', description: 'Google Workspace storage', icon: icons.database,
+                color: '#3b82f6', // blue-500
+                supportLink: 'https://support.google.com/drive', bestFor: 'General research data and team collaboration',
+                details: {
+                    storage: '100 GB shared storage across Google Drive, Gmail, and Google Photos',
+                    security: 'Encrypted in transit (TLS) and at rest (AES 128-bit). Two-factor authentication available. Delegated authentication through Lakehead SSO.',
+                    access: 'Granular sharing controls, public links, expiration dates. DLP capabilities for Enterprise customers.',
+                    backup: 'Google manages redundancy across data centers',
+                    location: 'Google data centers',
+                    cost: 'Included with Google Workspace account'
+                },
+                requirements: {
+                    classification: ['internal', 'public'], amount: ['small', 'medium'],
+                    collaboration: ['internal', 'external', 'public'], usage: ['active'],
+                    backup: ['managed', 'none']
+                }
+            },
+            {
+                id: 'nextcloud', name: 'Nextcloud', description: 'Alliance cloud storage service', icon: icons.shield,
+                color: '#8b5cf6', // purple-500
+                supportLink: 'https://docs.alliancecan.ca/wiki/Nextcloud', bestFor: 'Secure collaboration with Canadian researchers',
+                details: {
+                    storage: '100 GB fixed quota per user',
+                    security: 'All data transfers encrypted. Alliance username/password authentication.',
+                    access: 'Web interface, Desktop Sync Client, mobile apps, WebDAV clients. Share with Alliance users or external via email links.',
+                    backup: 'Daily backup without offsite copy',
+                    location: 'Simon Fraser University, Burnaby, BC',
+                    cost: 'Free for Alliance users'
+                },
+                requirements: {
+                    classification: ['confidential', 'internal', 'public'], amount: ['small', 'medium', 'large'],
+                    collaboration: ['internal', 'external'], usage: ['active', 'archive'],
+                    backup: ['basic', 'managed', 'none']
+                }
+            },
+            {
+                id: 'filecluster', name: 'Lakehead Filecluster', description: 'On-campus Windows File Server', icon: icons.users,
+                color: '#22c55e', // green-500
+                supportLink: 'https://www.lakeheadu.ca/faculty-and-staff/departments/services/helpdesk', bestFor: 'Highly sensitive data requiring maximum security',
+                details: {
+                    storage: '2 GB default personal share, departmental shares available upon request',
+                    security: 'NTFS/Share permissions, Active Directory integration, Windows Firewall, network segmentation',
+                    access: 'On-campus access or VPN required. Windows/Mac compatible via SMB.',
+                    backup: 'Daily backups stored on disc (14 days) and archived to tape',
+                    location: 'On-campus at Lakehead University',
+                    cost: 'Free upon departmental approval'
+                },
+                requirements: {
+                    classification: ['confidential', 'internal', 'public'], amount: ['small'],
+                    collaboration: ['internal'], usage: ['active', 'archive'],
+                    backup: ['comprehensive', 'basic', 'managed']
+                }
+            }
+        ];
+        
+        // Steps/questions for the wizard
+        const steps = [
+            {
+                id: 'classification', title: 'What type of data will you be storing?',
+                subtitle: 'This helps us ensure proper security measures', icon: '🔒',
+                options: [
+                    { value: 'confidential', label: 'Confidential/Sensitive', description: 'Data only available to limited authorized individuals; unauthorized disclosure could result in severe harm to an individual or the University', examples: ['Human participants\' names, addresses, health & medical information', 'Personal health information (PHI) including diagnoses, health card numbers', 'Income and financial information', 'Intellectual property and unpublished research data', 'Ethnic or racial identity, sexual orientation, religious beliefs'], riskLevel: 'High', harmDescription: 'Severe harm including diminished trust, legal consequences, loss of IP control' },
+                    { value: 'internal', label: 'Internal/Private', description: 'Data available to authorized users for research purposes; unauthorized disclosure could result in minor harm to an individual or the University', examples: ['Research team meeting minutes & correspondence', 'Contracts between researchers & community partners', 'Project funders\' contact information', 'De-identified participant data (where re-identification risk remains)', 'Internal working documents and analysis'], riskLevel: 'Medium', harmDescription: 'Minor harm including diminished trust, potential loss of partnerships' },
+                    { value: 'public', label: 'Public', description: 'Data that is deemed public by legislation or through a University policy; disclosure would not result in any harm to an individual or the University', examples: ['Published research data', 'Researchers\' names and business contact information', 'Aggregated human subject data (where re-identification is not possible)', 'Public announcements and news articles', 'Annual reports and public documentation'], riskLevel: 'Low', harmDescription: 'No harm expected from disclosure' }
+                ]
+            },
+            {
+                id: 'amount', title: 'How much storage do you need?',
+                subtitle: 'Estimate your total storage requirements', icon: '📊',
+                options: [
+                    { value: 'small', label: 'Small (< 5 GB)', description: 'Documents, spreadsheets, small datasets', examples: ['Text files', 'Survey results', 'Literature reviews'] },
+                    { value: 'medium', label: 'Medium (5-50 GB)', description: 'Larger datasets, some media files', examples: ['Image collections', 'Audio interviews', 'Statistical datasets'] },
+                    { value: 'large', label: 'Large (50+ GB)', description: 'Video files, large imaging datasets', examples: ['Video recordings', 'Medical imaging', 'Genomic data'] }
+                ]
+            },
+            {
+                id: 'collaboration', title: 'Who needs access to this data?',
+                subtitle: 'Determine your collaboration requirements', icon: '👥',
+                options: [
+                    { value: 'internal', label: 'Only Lakehead researchers', description: 'Data stays within the university', examples: ['Department team', 'Lab members', 'Student assistants'] },
+                    { value: 'external', label: 'External collaborators', description: 'Share with specific people outside Lakehead', examples: ['Partner institutions', 'Industry partners', 'International collaborators'] },
+                    { value: 'public', label: 'Public access', description: 'Data will be publicly available', examples: ['Open data repository', 'Public website', 'Community access'] }
+                ]
+            },
+            {
+                id: 'usage', title: 'How will you use this storage?',
+                subtitle: 'This affects performance and feature requirements', icon: '⚡',
+                options: [
+                    { value: 'active', label: 'Active research', description: 'Frequently accessed and modified data', examples: ['Ongoing analysis', 'Daily data collection', 'Active collaboration'] },
+                    { value: 'archive', label: 'Long-term archive', description: 'Completed research for retention', examples: ['Completed projects', 'Compliance storage', 'Historical records'] }
+                ]
+            },
+            {
+                id: 'backup', title: 'What are your backup requirements?',
+                subtitle: 'Protect against data loss', icon: '🛡️',
+                options: [
+                    { value: 'comprehensive', label: 'Comprehensive backup', description: 'Multiple backups with offsite storage', examples: ['Critical research', 'Irreplaceable data', 'Grant requirements'] },
+                    { value: 'basic', label: 'Basic backup', description: 'Regular backups for peace of mind', examples: ['Standard research data', 'Reproducible analysis'] },
+                    { value: 'managed', label: 'Provider-managed', description: 'Trust the storage provider\'s redundancy', examples: ['Cloud-native workflows', 'Non-critical data'] },
+                    { value: 'none', label: 'No backup needed', description: 'Data is temporary or backed up elsewhere', examples: ['Temporary files', 'Working copies'] }
+                ]
+            }
+        ];
+
+        // --- CORE LOGIC FUNCTIONS ---
+
+        function handleSelection(value) {
+            const stepId = steps[state.currentStep].id;
+            state.selections[stepId] = value;
+            render(); // Re-render the UI
+        }
+
+        function nextStep() {
+            if (state.currentStep < steps.length - 1) {
+                state.currentStep++;
+            } else {
+                calculateResults();
+            }
+            render();
+        }
+
+        function prevStep() {
+            if (state.currentStep > 0) {
+                state.currentStep--;
+            }
+            render();
+        }
+
+        function toggleClassificationHelp() {
+            state.showClassificationHelp = !state.showClassificationHelp;
+            render();
+        }
+
+        function calculateResults() {
+            const compatible = storageOptions.filter(option => {
+                if (!option.requirements.classification.includes(state.selections.classification)) return false;
+                if (!option.requirements.amount.includes(state.selections.amount)) return false;
+                if (!option.requirements.collaboration.includes(state.selections.collaboration)) return false;
+                if (!option.requirements.usage.includes(state.selections.usage)) return false;
+                if (!option.requirements.backup.includes(state.selections.backup)) return false;
+                return true;
+            });
+
+            state.selectedServices = compatible.map(opt => opt.id);
+            state.showResults = true;
+            render();
+        }
+        
+        function getRecommendationLevel(serviceId) {
+            const service = storageOptions.find(s => s.id === serviceId);
+            let score = 0;
+            if (state.selections.classification === 'confidential' && serviceId === 'filecluster') score += 3;
+            if (state.selections.classification === 'internal' && serviceId === 'nextcloud') score += 2;
+            if (state.selections.classification === 'public' && serviceId === 'google-drive') score += 2;
+            if (state.selections.collaboration === 'external' && serviceId === 'google-drive') score += 2;
+            if (state.selections.collaboration === 'external' && serviceId === 'nextcloud') score += 1;
+            if (state.selections.backup === 'comprehensive' && serviceId === 'filecluster') score += 2;
+            return score;
+        }
+
+        function startOver() {
+            state = {
+                currentStep: 0,
+                selections: { classification: null, amount: null, collaboration: null, usage: null, backup: null },
+                showResults: false,
+                selectedServices: [],
+                showClassificationHelp: false
+            };
+            render();
+        }
+
+        function exportResults() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+            const sortedServices = [...state.selectedServices].sort((a, b) => getRecommendationLevel(b) - getRecommendationLevel(a));
+            
+            const page = {
+                width: doc.internal.pageSize.getWidth(),
+                height: doc.internal.pageSize.getHeight(),
+                margin: 15
+            };
+            let yPos = 0;
+
+            // --- PDF HELPER FUNCTIONS ---
+            const checkPageBreak = (neededHeight) => {
+                if (yPos + neededHeight > page.height - page.margin) {
+                    doc.addPage();
+                    yPos = page.margin;
+                    return true;
+                }
+                return false;
+            };
+
+            const drawHeader = () => {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(20);
+                doc.setTextColor('#111827'); // gray-900
+                doc.text('Research Data Storage Recommendations', page.margin, 20);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                doc.setTextColor('#6B7280'); // gray-500
+                doc.text(`Report generated on: ${new Date().toLocaleDateString()}`, page.margin, 26);
+                doc.setDrawColor('#E5E7EB'); // gray-200
+                doc.line(page.margin, 32, page.width - page.margin, 32);
+                yPos = 40;
+            };
+            
+            const drawFooter = () => {
+                const pageCount = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= pageCount; i++) {
+                    doc.setPage(i);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(9);
+                    doc.setTextColor('#6B7280');
+                    const footerText = `Page ${i} of ${pageCount} | Lakehead University Storage Finder`;
+                    doc.text(footerText, page.width / 2, page.height - 10, { align: 'center' });
+                }
+            };
+
+            const drawSectionHeader = (title) => {
+                checkPageBreak(15);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(14);
+                doc.setTextColor('#111827');
+                doc.text(title, page.margin, yPos);
+                yPos += 8;
+            };
+
+            const drawRequirements = () => {
+                drawSectionHeader('Your Requirements Summary');
+                
+                const cardX = page.margin;
+                const cardY = yPos;
+                const cardWidth = page.width - (page.margin * 2);
+                let cardHeight = 10;
+                
+                // Pre-calculate height
+                Object.entries(state.selections).forEach(([key, value]) => {
+                    if (!value) return;
+                    cardHeight += 8; // Increased spacing for better readability
+                });
+                
+                checkPageBreak(cardHeight + 10);
+                doc.setFillColor('#F9FAFB'); // gray-50
+                doc.setDrawColor('#F3F4F6'); // gray-100
+                doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 3, 3, 'FD');
+                yPos += 8;
+
+                Object.entries(state.selections).forEach(([key, value]) => {
+                    if (!value) return;
+                    const step = steps.find(s => s.id === key);
+                    const option = step?.options.find(o => o.value === value);
+                    
+                    // Draw the category title (Label) - NO ICON
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(10);
+                    doc.setTextColor('#374151'); // gray-700
+                    doc.text(`${step.title.replace('?', '')}:`, page.margin + 5, yPos, { align: 'left' });
+
+                    // Draw the selected option (Value) - aligned to the right
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor('#111827');
+                    doc.text(option.label, page.width - page.margin - 5, yPos, { align: 'right', maxWidth: cardWidth / 2 - 10 });
+                    
+                    yPos += 8; // Increase spacing
+                });
+                yPos = cardY + cardHeight + 10;
+            };
+
+            const drawRecommendationCard = (service, isTop) => {
+                const cardWidth = page.width - (page.margin * 2);
+                const headerHeight = 18;
+                const topRecBannerHeight = isTop ? 10 : 0;
+                
+                // Calculate card height dynamically
+                let cardHeight = headerHeight + topRecBannerHeight + 15; // padding
+                Object.values(service.details).forEach(value => {
+                    const textLines = doc.splitTextToSize(value, cardWidth - 20); // 10 padding on each side
+                    cardHeight += (textLines.length * 4.5) + 6; // line height + padding
+                });
+                
+                checkPageBreak(cardHeight);
+                
+                // Draw card container
+                doc.setDrawColor('#D1D5DB'); // gray-300
+                doc.setFillColor('#FFFFFF');
+                doc.roundedRect(page.margin, yPos, cardWidth, cardHeight, 3, 3, 'FD');
+                let cardY = yPos;
+
+                // Draw "Best Match" banner if applicable
+                if (isTop) {
+                    doc.setFillColor('#10B981'); // green-500
+                    doc.roundedRect(page.margin, cardY, cardWidth, topRecBannerHeight, 3, 3, 'F');
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(10);
+                    doc.setTextColor('#FFFFFF');
+                    doc.text('⭐ Best Match for Your Needs', page.margin + 5, cardY + 6.5);
+                    cardY += topRecBannerHeight;
+                }
+
+                // Draw card header
+                doc.setFillColor(service.color);
+                doc.rect(page.margin, cardY, cardWidth, headerHeight, 'F');
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(14);
+                doc.setTextColor('#FFFFFF');
+                doc.text(service.name, page.margin + 5, cardY + 12);
+                
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.text(service.bestFor, page.width - page.margin - 5, cardY + 12, { align: 'right' });
+                
+                cardY += headerHeight + 10; // Move down into content area
+
+                // Draw details
+                Object.entries(service.details).forEach(([key, value]) => {
+                    const capitalizedKey = key.charAt(0).toUpperCase() + key.slice(1);
+                    const textLines = doc.splitTextToSize(value, cardWidth - 20);
+                    const neededHeight = (textLines.length * 4.5) + 6;
+
+                    if (cardY + neededHeight > yPos + cardHeight - 5) { // Check if content overflows card
+                        // This case is complex, for now we assume card fits on one page
+                    }
+
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(10);
+                    doc.setTextColor('#374151');
+                    doc.text(capitalizedKey, page.margin + 10, cardY);
+                    
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor('#111827');
+                    doc.text(textLines, page.margin + 10, cardY + 5);
+                    cardY += neededHeight;
+                });
+                yPos += cardHeight + 10;
+            };
+            
+            // --- PDF DOCUMENT ASSEMBLY ---
+            drawHeader();
+            drawRequirements();
+
+            drawSectionHeader('Recommended Storage Solutions');
+            
+            if (sortedServices.length > 0) {
+                sortedServices.forEach((serviceId, index) => {
+                    const service = storageOptions.find(s => s.id === serviceId);
+                    const recommendationLevel = getRecommendationLevel(serviceId);
+                    const isTopRecommendation = index === 0 && recommendationLevel > 0;
+                    drawRecommendationCard(service, isTopRecommendation);
+                });
+            } else {
+                 checkPageBreak(20);
+                 doc.setFont('helvetica', 'italic');
+                 doc.setTextColor('#4B5563'); // gray-600
+                 doc.text('No suitable storage options were found based on your specific requirements.', page.margin, yPos);
+                 yPos += 7;
+                 doc.text('Please contact IT Services for a custom consultation.', page.margin, yPos);
+            }
+
+            drawFooter();
+            doc.save(`storage-recommendations-${new Date().toISOString().split('T')[0]}.pdf`);
+        }
+
+        // --- RENDERING FUNCTIONS (UNCHANGED) ---
+
+        function renderWizard() {
+            const currentStepData = steps[state.currentStep];
+            const progress = ((state.currentStep + 1) / steps.length) * 100;
+
+            const riskLevelClass = (level) => {
+                if (level === 'High') return 'bg-red-100 text-red-700';
+                if (level === 'Medium') return 'bg-yellow-100 text-yellow-700';
+                return 'bg-green-100 text-green-700';
+            };
+            
+            const classificationHelpHTML = `
+                <div class="mb-8 p-6 bg-blue-50 rounded-xl border border-blue-200">
+                    <h3 class="font-semibold text-blue-900 mb-3 flex items-center gap-2">${icons.info} Understanding Data Classification</h3>
+                    <div class="space-y-3 text-sm text-blue-800">
+                        <p><strong>What is data classification?</strong> It's the process of assigning a sensitivity level to research data to identify the appropriate controls for handling and protecting that data.</p>
+                        <p><strong>Why is it important?</strong> Proper classification ensures: Quality, integrity, security, and authorized accessibility of research data; Compliance with legislative and regulatory requirements; Protection against unauthorized access, manipulation, or disclosure.</p>
+                        <div class="mt-4 p-4 bg-white rounded-lg">
+                            <p class="font-medium text-gray-900 mb-2">Key factors to consider:</p>
+                            <ul class="space-y-2 text-gray-700">
+                                <li class="flex items-start gap-2"><span class="text-red-500 mt-1">•</span><span><strong>Personal Information (PI):</strong> Names, birthdates, identification documents, financial information</span></li>
+                                <li class="flex items-start gap-2"><span class="text-red-500 mt-1">•</span><span><strong>Personal Health Information (PHI):</strong> Health diagnoses, medical history, genetic information</span></li>
+                                <li class="flex items-start gap-2"><span class="text-red-500 mt-1">•</span><span><strong>Sensitive Information:</strong> Ethnic/racial identity, sexual orientation, religious/political beliefs</span></li>
+                            </ul>
+                        </div>
+                        <div class="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                            <p class="text-xs text-amber-800"><strong>Note for Indigenous Research Data:</strong> For research involving Indigenous peoples in Canada, ownership of research data is governed by the First Nations Principles of OCAP®. Consult with the Office of Research Services if your research involves First Nations, Inuit, or Métis participants.</p>
+                        </div>
+                    </div>
+                </div>`;
+
+            return `
+                <header class="bg-white shadow-lg border-b border-gray-200">
+                    <div class="max-w-4xl mx-auto px-6 py-6">
+                        <h1 class="text-3xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Research Data Storage Finder</h1>
+                        <p class="text-gray-600 mt-2">Let's find the perfect storage solution for your research data</p>
+                    </div>
+                </header>
+
+                <main class="max-w-4xl mx-auto px-6 py-8">
+                    <!-- Progress Bar -->
+                    <div class="mb-8">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-gray-600">Step ${state.currentStep + 1} of ${steps.length}</span>
+                            <span class="text-sm text-gray-500">${Math.round(progress)}% complete</span>
+                        </div>
+                        <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300" style="width: ${progress}%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Question Card -->
+                    <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+                        <div class="text-center mb-8">
+                            <span class="text-6xl mb-4 block">${currentStepData.icon}</span>
+                            <h2 class="text-2xl font-bold text-gray-900 mb-2 flex items-center justify-center gap-2">
+                                ${currentStepData.title}
+                                ${state.currentStep === 0 ? `
+                                <div class="relative group">
+                                    ${icons.helpCircle}
+                                    <div class="absolute z-10 w-72 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg -top-2 left-8 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                        <div class="absolute w-2 h-2 bg-gray-900 transform rotate-45 -left-1 top-4"></div>
+                                        Data classification determines the security controls needed to protect your research data.
+                                    </div>
+                                </div>` : ''}
+                            </h2>
+                            <p class="text-gray-600">${currentStepData.subtitle}</p>
+                            ${state.currentStep === 0 ? `
+                            <button onclick="toggleClassificationHelp()" class="mt-4 inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors">
+                                ${icons.bookOpen}
+                                <span class="text-sm font-medium">Learn about data classification</span>
+                            </button>` : ''}
+                        </div>
+
+                        ${state.currentStep === 0 && state.showClassificationHelp ? classificationHelpHTML : ''}
+
+                        <div class="space-y-4">
+                            ${currentStepData.options.map(option => {
+                                const isSelected = state.selections[currentStepData.id] === option.value;
+                                return `
+                                <button onclick="handleSelection('${option.value}')" class="w-full text-left p-6 rounded-xl border-2 transition-all ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}">
+                                    <div class="flex items-start gap-4">
+                                        <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}">
+                                            ${isSelected ? icons.check : ''}
+                                        </div>
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-3 mb-1">
+                                                <h3 class="font-semibold text-gray-900">${option.label}</h3>
+                                                ${option.riskLevel ? `<span class="text-xs px-2 py-1 rounded-full font-medium ${riskLevelClass(option.riskLevel)}">${option.riskLevel} Risk</span>` : ''}
+                                            </div>
+                                            <p class="text-gray-600 text-sm mb-3">${option.description}</p>
+                                            ${option.harmDescription ? `<p class="text-xs text-gray-500 italic mb-3"><strong>Potential Impact:</strong> ${option.harmDescription}</p>` : ''}
+                                            ${option.examples ? `
+                                            <div class="space-y-1">
+                                                <p class="text-xs font-medium text-gray-700">Examples include:</p>
+                                                <div class="flex flex-wrap gap-2">
+                                                    ${option.examples.map(ex => `<span class="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded">${ex}</span>`).join('')}
+                                                </div>
+                                            </div>` : ''}
+                                        </div>
+                                    </div>
+                                </button>`;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Navigation -->
+                    <div class="flex justify-between">
+                        <button onclick="prevStep()" ${state.currentStep === 0 ? 'disabled' : ''} class="flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${state.currentStep === 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}">
+                            ${icons.chevronLeft} Previous
+                        </button>
+                        <button onclick="nextStep()" ${!state.selections[currentStepData.id] ? 'disabled' : ''} class="flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${!state.selections[currentStepData.id] ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 transform hover:scale-105 shadow-md'}">
+                            ${state.currentStep === steps.length - 1 ? 'Get Recommendations' : 'Next'} ${icons.chevronRight}
+                        </button>
+                    </div>
+                </main>
+            `;
+        }
+
+        function renderResults() {
+            const sortedServices = [...state.selectedServices].sort((a, b) => getRecommendationLevel(b) - getRecommendationLevel(a));
+            const colorClasses = (id) => storageOptions.find(s => s.id === id)?.colorClasses || {bg: 'bg-gray-100', text: 'text-gray-600'};
+            
+            const requirementsSummaryHTML = `
+                <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+                    <h3 class="font-semibold text-gray-900 mb-4">Your Requirements Summary</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        ${Object.entries(state.selections).map(([key, value]) => {
+                            if (!value) return '';
+                            const step = steps.find(s => s.id === key);
+                            const option = step?.options.find(o => o.value === value);
+                            return `
+                            <div class="flex items-center gap-2 text-sm">
+                                <span class="text-lg">${step?.icon}</span>
+                                <div>
+                                    <p class="font-medium text-gray-700">${option?.label}</p>
+                                    <p class="text-xs text-gray-500 capitalize">${key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>`;
+
+            const resultsHTML = sortedServices.length > 0 ? `
+                <div class="space-y-6">
+                    ${sortedServices.map((serviceId, index) => {
+                        const service = storageOptions.find(s => s.id === serviceId);
+                        const recommendationLevel = getRecommendationLevel(serviceId);
+                        const isTopRecommendation = index === 0 && recommendationLevel > 0;
+                        const serviceColor = colorClasses(serviceId);
+                        return `
+                        <div class="bg-white rounded-xl shadow-lg overflow-hidden transition-all hover:shadow-xl ${isTopRecommendation ? 'ring-2 ring-green-500' : ''}">
+                            ${isTopRecommendation ? `
+                            <div class="bg-gradient-to-r from-green-500 to-teal-500 text-white px-6 py-3 flex items-center gap-2">
+                                ${icons.award} <span class="font-semibold">Best Match for Your Needs</span>
+                            </div>` : ''}
+                            <div class="p-8">
+                                <div class="flex items-start justify-between mb-6">
+                                    <div class="flex items-center gap-4">
+                                        <div class="p-3 rounded-xl" style="background-color: ${service.color}20;">
+                                            <div class="w-12 h-12" style="color: ${service.color};">${service.icon}</div>
+                                        </div>
+                                        <div>
+                                            <h3 class="text-2xl font-bold text-gray-900">${service.name}</h3>
+                                            <p class="text-gray-600 mt-1">${service.bestFor}</p>
+                                        </div>
+                                    </div>
+                                    <a href="${service.supportLink}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
+                                        <span class="font-medium">Get Started</span> ${icons.externalLink}
+                                    </a>
+                                </div>
+                                <div class="grid md:grid-cols-2 gap-6">
+                                    ${Object.entries(service.details).map(([key, value]) => `
+                                    <div class="border-l-4 border-gray-200 pl-4">
+                                        <p class="font-semibold text-gray-700 mb-1 capitalize">${key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                                        <p class="text-gray-600 text-sm leading-relaxed">${value}</p>
+                                    </div>`).join('')}
+                                </div>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                    <div class="flex justify-center mt-8">
+                        <button onclick="exportResults()" class="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white font-medium rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all transform hover:scale-105 shadow-md">
+                            ${icons.download} Export as PDF
+                        </button>
+                    </div>
+                </div>` : `
+                <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-8 text-center">
+                    ${icons.alertCircle}
+                    <h3 class="text-xl font-semibold text-yellow-900 mb-2">No Perfect Match Found</h3>
+                    <p class="text-yellow-700 mb-6">Your requirements are quite specific. We recommend contacting IT Services for a custom solution.</p>
+                    <a href="https://www.lakeheadu.ca/faculty-and-staff/departments/services/helpdesk" class="inline-flex items-center gap-2 px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors">
+                        Contact IT Services ${icons.externalLink}
+                    </a>
+                </div>`;
+
+            return `
+                <header class="bg-white shadow-lg border-b border-gray-200">
+                    <div class="max-w-4xl mx-auto px-6 py-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h1 class="text-3xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Your Storage Recommendations</h1>
+                                <p class="text-gray-600 mt-2">Based on your requirements, we found ${sortedServices.length} suitable option${sortedServices.length !== 1 ? 's' : ''}</p>
+                            </div>
+                            <button onclick="startOver()" class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                ${icons.refreshCw} Start Over
+                            </button>
+                        </div>
+                    </div>
+                </header>
+                <main class="max-w-4xl mx-auto px-6 py-8">
+                    ${requirementsSummaryHTML}
+                    ${resultsHTML}
+                </main>
+            `;
+        }
+
+        function render() {
+            const appElement = document.getElementById('app');
+            if (state.showResults) {
+                appElement.innerHTML = renderResults();
+            } else {
+                appElement.innerHTML = renderWizard();
+            }
+        }
+
+        // --- INITIAL RENDER ---
+        document.addEventListener('DOMContentLoaded', render);
+
+    </script>
+</body>
+</html>
